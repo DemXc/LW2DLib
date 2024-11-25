@@ -1,15 +1,17 @@
 #ifndef LW2D_H
 #define LW2D_H
 
+#define STB_IMAGE_IMPLEMENTATION
+#define STBI_ONLY_PNG
+#include "stb/stb_image.h"
+
 #include <GLFW/glfw3.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-
 #define LW2D_PRESS 1
 #define LW2D_RELEASE 0
 #define LW2D_REPEAT 2
-
 
 #define LW2D_KEY_W GLFW_KEY_W
 #define LW2D_KEY_S GLFW_KEY_S
@@ -21,9 +23,82 @@ typedef struct {
     void (*key_callback)(int, int, int, int);
 } LW2DWindow;
 
+typedef struct {
+    float x, y, z;
+    float vx, vy, vz;
+    float life;
+} Particle;
+
+typedef struct {
+    Particle* particles;
+    int count;
+    int capacity;
+} ParticleSystem;
+
+void addParticle(ParticleSystem* ps, float x, float y, float z) {
+    if (ps->count >= ps->capacity) return; // Проверка на переполнение
+
+    float vx = (float)rand() / RAND_MAX - 0.5f;
+    float vy = (float)rand() / RAND_MAX - 0.5f;
+    float vz = (float)rand() / RAND_MAX - 0.5f;
+
+    ps->particles[ps->count++] = (Particle){x, y, z, vx, vy, vz, 1.0f};
+}
+
+void updateParticles(ParticleSystem* ps, float deltaTime) {
+    for (int i = 0; i < ps->count; ++i) {
+        Particle* p = &ps->particles[i];
+        p->x += p->vx * deltaTime;
+        p->y += p->vy * deltaTime;
+        p->z += p->vz * deltaTime;
+        p->life -= deltaTime;
+        if (p->life <= 0.0f) {
+            // Замена текущей частицы последней и уменьшение количества
+            ps->particles[i--] = ps->particles[--ps->count];
+        }
+    }
+}
+
+void renderParticles(const ParticleSystem* ps) {
+    glBegin(GL_POINTS);
+    for (int i = 0; i < ps->count; ++i) {
+        const Particle* p = &ps->particles[i];
+        glVertex3f(p->x, p->y, p->z);
+    }
+    glEnd();
+}
+
 void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
     (void)window;
     glViewport(0, 0, width, height);
+}
+
+GLuint LW2D_loadTexture(const char* filename) {
+    int width, height;
+    printf("Attempting to load texture from: %s\n", filename); // Отладочный вывод
+
+    unsigned char* data = stbi_load(filename, &width, &height, NULL, 0);
+    if (!data) {
+        printf("Failed to load texture data: %s\n", stbi_failure_reason()); // Отладочный вывод
+        return 0;
+    }
+
+    printf("Texture loaded successfully: %dx%d\n", width, height); // Отладочный вывод
+
+    GLuint texture;
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D, texture);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, 
+                 GL_RGB, GL_UNSIGNED_BYTE, data);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    stbi_image_free(data);
+    return texture;
 }
 
 int convertActionToLW2D(int action) {
