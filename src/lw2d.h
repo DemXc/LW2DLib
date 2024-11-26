@@ -1,27 +1,34 @@
 #ifndef LW2D_H
 #define LW2D_H
 
-#define STB_IMAGE_IMPLEMENTATION
-#define STBI_ONLY_PNG
 #include "stb/stb_image.h"
-
-#include <GLFW/glfw3.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
+#include <GL/glew.h> // Используем GLEW для работы с современным OpenGL
 
 #define LW2D_PRESS 1
 #define LW2D_RELEASE 0
 #define LW2D_REPEAT 2
 
-#define LW2D_KEY_W GLFW_KEY_W
-#define LW2D_KEY_S GLFW_KEY_S
-#define LW2D_KEY_A GLFW_KEY_A
-#define LW2D_KEY_D GLFW_KEY_D
+#define LW2D_KEY_W 87
+#define LW2D_KEY_S 83
+#define LW2D_KEY_A 65
+#define LW2D_KEY_D 68
 
 typedef struct {
-    GLFWwindow* window;
-    void (*key_callback)(int, int, int, int);
+    int width, height;
+    const char* title;
+    void* internal_context; // Хранение контекста платформы
+    void (*key_callback)(int, int, int);
 } LW2DWindow;
+
+typedef struct {
+    GLuint vao;
+    GLuint vbo;
+    GLuint ebo;
+    GLuint shader_program;
+} LW2DRenderContext;
 
 typedef struct {
     float x, y, z;
@@ -35,8 +42,103 @@ typedef struct {
     int capacity;
 } ParticleSystem;
 
-void addParticle(ParticleSystem* ps, float x, float y, float z) {
-    if (ps->count >= ps->capacity) return; // Проверка на переполнение
+// ====== Инициализация и управление окном ======
+
+LW2DWindow* LW2D_createWindow(int width, int height, const char* title);
+void LW2D_destroyWindow(LW2DWindow* window);
+void LW2D_pollEvents(LW2DWindow* window);
+void LW2D_setKeyCallback(LW2DWindow* window, void (*callback)(int, int, int));
+bool LW2D_shouldClose(LW2DWindow* window);
+
+// ====== Управление контекстом рендеринга ======
+
+LW2DRenderContext* LW2D_initRenderContext();
+void LW2D_clear(float r, float g, float b, float a);
+void LW2D_swapBuffers(LW2DWindow* window);
+
+// ====== Частицы ======
+
+void LW2D_addParticle(ParticleSystem* ps, float x, float y, float z);
+void LW2D_updateParticles(ParticleSystem* ps, float deltaTime);
+void LW2D_renderParticles(const ParticleSystem* ps, const LW2DRenderContext* context);
+
+// ====== Загрузка текстур ======
+
+GLuint LW2D_loadTexture(const char* filename);
+
+// ====== Реализация ======
+
+LW2DWindow* LW2D_createWindow(int width, int height, const char* title) {
+    // Инициализация платформозависимого окна и OpenGL контекста
+    printf("Creating window: %dx%d, %s\n", width, height, title);
+
+    LW2DWindow* window = (LW2DWindow*)malloc(sizeof(LW2DWindow));
+    if (!window) {
+        fprintf(stderr, "Failed to allocate memory for LW2DWindow\n");
+        exit(EXIT_FAILURE);
+    }
+    window->width = width;
+    window->height = height;
+    window->title = title;
+    window->key_callback = NULL;
+
+    // Здесь должна быть инициализация контекста (например, EGL, GLX или Cocoa)
+    // Пример будет работать на платформозависимом уровне
+    return window;
+}
+
+void LW2D_destroyWindow(LW2DWindow* window) {
+    // Освобождение ресурсов окна
+    free(window);
+}
+
+void LW2D_pollEvents(LW2DWindow* window) {
+    // Обработка событий
+    // Реализуйте на уровне системы (например, X11, WinAPI)
+}
+
+void LW2D_setKeyCallback(LW2DWindow* window, void (*callback)(int, int, int)) {
+    window->key_callback = callback;
+}
+
+bool LW2D_shouldClose(LW2DWindow* window) {
+    // Проверьте, был ли запрос на закрытие окна
+    return false; // Замените на платформозависимую проверку
+}
+
+// ====== Рендеринг ======
+
+LW2DRenderContext* LW2D_initRenderContext() {
+    LW2DRenderContext* context = (LW2DRenderContext*)malloc(sizeof(LW2DRenderContext));
+    if (!context) {
+        fprintf(stderr, "Failed to allocate memory for LW2DRenderContext\n");
+        exit(EXIT_FAILURE);
+    }
+
+    // Инициализация OpenGL объектов
+    glGenVertexArrays(1, &context->vao);
+    glGenBuffers(1, &context->vbo);
+    glGenBuffers(1, &context->ebo);
+
+    // Создание и компиляция шейдеров (реализуйте шейдеры отдельно)
+    context->shader_program = glCreateProgram();
+    // Пример шейдера должен быть написан и загружен сюда
+    return context;
+}
+
+void LW2D_clear(float r, float g, float b, float a) {
+    glClearColor(r, g, b, a);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+}
+
+void LW2D_swapBuffers(LW2DWindow* window) {
+    // Обмен буферов (например, через платформозависимый вызов)
+}
+
+// ====== Управление частицами ======
+
+void LW2D_addParticle(ParticleSystem* ps, float x, float y, float z) {
+    if (ps->count >= ps->capacity) return;
 
     float vx = (float)rand() / RAND_MAX - 0.5f;
     float vy = (float)rand() / RAND_MAX - 0.5f;
@@ -45,7 +147,7 @@ void addParticle(ParticleSystem* ps, float x, float y, float z) {
     ps->particles[ps->count++] = (Particle){x, y, z, vx, vy, vz, 1.0f};
 }
 
-void updateParticles(ParticleSystem* ps, float deltaTime) {
+void LW2D_updateParticles(ParticleSystem* ps, float deltaTime) {
     for (int i = 0; i < ps->count; ++i) {
         Particle* p = &ps->particles[i];
         p->x += p->vx * deltaTime;
@@ -53,123 +155,42 @@ void updateParticles(ParticleSystem* ps, float deltaTime) {
         p->z += p->vz * deltaTime;
         p->life -= deltaTime;
         if (p->life <= 0.0f) {
-            // Замена текущей частицы последней и уменьшение количества
             ps->particles[i--] = ps->particles[--ps->count];
         }
     }
 }
 
-void renderParticles(const ParticleSystem* ps) {
-    glBegin(GL_POINTS);
-    for (int i = 0; i < ps->count; ++i) {
-        const Particle* p = &ps->particles[i];
-        glVertex3f(p->x, p->y, p->z);
-    }
-    glEnd();
+void LW2D_renderParticles(const ParticleSystem* ps, const LW2DRenderContext* context) {
+    glBindVertexArray(context->vao);
+    glUseProgram(context->shader_program);
+
+    // Загрузите данные частиц в VBO
+    glBindBuffer(GL_ARRAY_BUFFER, context->vbo);
+    glBufferData(GL_ARRAY_BUFFER, ps->count * sizeof(Particle), ps->particles, GL_DYNAMIC_DRAW);
+
+    // Настройка атрибутов шейдера и отрисовка
+    glDrawArrays(GL_POINTS, 0, ps->count);
 }
 
-void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
-    (void)window;
-    glViewport(0, 0, width, height);
-}
+// ====== Текстуры ======
 
 GLuint LW2D_loadTexture(const char* filename) {
     int width, height;
-    printf("Attempting to load texture from: %s\n", filename); // Отладочный вывод
-
-    unsigned char* data = stbi_load(filename, &width, &height, NULL, 0);
+    unsigned char* data = stbi_load(filename, &width, &height, NULL, 4);
     if (!data) {
-        printf("Failed to load texture data: %s\n", stbi_failure_reason()); // Отладочный вывод
+        fprintf(stderr, "Failed to load texture: %s\n", filename);
         return 0;
     }
-
-    printf("Texture loaded successfully: %dx%d\n", width, height); // Отладочный вывод
 
     GLuint texture;
     glGenTextures(1, &texture);
     glBindTexture(GL_TEXTURE_2D, texture);
-
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, 
-                 GL_RGB, GL_UNSIGNED_BYTE, data);
-
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
     stbi_image_free(data);
     return texture;
-}
-
-int convertActionToLW2D(int action) {
-    switch (action) {
-        case GLFW_PRESS: return LW2D_PRESS;
-        case GLFW_RELEASE: return LW2D_RELEASE;
-        case GLFW_REPEAT: return LW2D_REPEAT;
-        default: return -1;
-    }
-}
-
-void internal_key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
-    LW2DWindow* lwWindow = (LW2DWindow*)glfwGetWindowUserPointer(window);
-    if (lwWindow && lwWindow->key_callback) {
-        int lw2d_action = convertActionToLW2D(action);
-        if (lw2d_action != -1) {
-            lwWindow->key_callback(key, scancode, lw2d_action, mods);
-        }
-    }
-}
-
-LW2DWindow* createWindow(int width, int height, const char* title) {
-    if (!glfwInit()) {
-        fprintf(stderr, "Failed to initialize GLFW\n");
-        exit(EXIT_FAILURE);
-    }
-
-    LW2DWindow* lwWindow = (LW2DWindow*)malloc(sizeof(LW2DWindow));
-    if (!lwWindow) {
-        fprintf(stderr, "Failed to allocate memory for LW2DWindow\n");
-        glfwTerminate();
-        exit(EXIT_FAILURE);
-    }
-
-    lwWindow->window = glfwCreateWindow(width, height, title, NULL, NULL);
-    if (!lwWindow->window) {
-        fprintf(stderr, "Failed to create GLFW window\n");
-        free(lwWindow);
-        glfwTerminate();
-        exit(EXIT_FAILURE);
-    }
-
-    glfwMakeContextCurrent(lwWindow->window);
-    glfwSetFramebufferSizeCallback(lwWindow->window, framebuffer_size_callback);
-    glfwSetWindowUserPointer(lwWindow->window, lwWindow);
-    lwWindow->key_callback = NULL;
-    glfwSetKeyCallback(lwWindow->window, internal_key_callback);
-
-    return lwWindow;
-}
-
-void setKeyCallback(LW2DWindow* lwWindow, void (*callback)(int, int, int, int)) {
-    lwWindow->key_callback = callback;
-}
-
-int shouldClose(LW2DWindow* lwWindow) {
-    return glfwWindowShouldClose(lwWindow->window);
-}
-
-void pollEvents() {
-    glfwPollEvents();
-}
-
-void swapBuffers(LW2DWindow* lwWindow) {
-    glfwSwapBuffers(lwWindow->window);
-}
-
-void destroyWindow(LW2DWindow* lwWindow) {
-    glfwDestroyWindow(lwWindow->window);
-    free(lwWindow);
-    glfwTerminate();
 }
 
 #endif // LW2D_H

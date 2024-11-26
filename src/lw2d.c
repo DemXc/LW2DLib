@@ -5,14 +5,12 @@ float cubePosY = 0.0f;
 GLuint texture;
 
 void drawCube() {
-    glBindTexture(GL_TEXTURE_2D, texture);
-
+    LW2D_bindTexture(texture);
     glBegin(GL_QUADS);
-        // Front face
-        glTexCoord2f(0.0f, 0.0f); glVertex2f(-0.9f, -0.9f);
-        glTexCoord2f(1.0f, 0.0f); glVertex2f( 0.9f, -0.9f);
-        glTexCoord2f(1.0f, 1.0f); glVertex2f( 0.9f,  0.9f);
-        glTexCoord2f(0.0f, 1.0f); glVertex2f(-0.9f,  0.9f);
+        LW2D_setTexCoord(0.0f, 0.0f); glVertex2f(-0.9f, -0.9f);
+        LW2D_setTexCoord(1.0f, 0.0f); glVertex2f( 0.9f, -0.9f);
+        LW2D_setTexCoord(1.0f, 1.0f); glVertex2f( 0.9f,  0.9f);
+        LW2D_setTexCoord(0.0f, 1.0f); glVertex2f(-0.9f,  0.9f);
     glEnd();
 }
 
@@ -33,33 +31,29 @@ void customKeyCallback(int key, int scancode, int action, int mods) {
 }
 
 int main() {
-    LW2DWindow* window = createWindow(800, 600, "LW2D Example");
+    LW2DWindow* window = LW2D_createWindow(800, 600, "LW2D Example");
+    LW2D_setKeyCallback(window, customKeyCallback);
 
-    setKeyCallback(window, customKeyCallback);
-
-    // Загрузка текстуры с использованием абсолютного пути
     texture = LW2D_loadTexture("/home/nikita/LW2DLib/src/character.png");
     if (texture == 0) {
         fprintf(stderr, "Failed to load texture\n");
         return -1;
     }
 
-    // Включение поддержки текстур
-    glEnable(GL_TEXTURE_2D);
+    LW2D_enableTextures();
 
-    while (!shouldClose(window)) {
-        glClearColor(0.0f, 0.05f, 0.5f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
+    while (!LW2D_shouldClose(window)) {
+        LW2D_clearScreen(0.0f, 0.05f, 0.5f, 1.0f);
 
         glPushMatrix();
-        glTranslatef(cubePosX, cubePosY, 0.0f);
+        LW2D_translate(cubePosX, cubePosY, 0.0f);
         drawCube();
         glPopMatrix();
 
-        pollEvents();
-        swapBuffers(window);
+        LW2D_pollEvents();
+        LW2D_swapBuffers(window);
     }
 
-    destroyWindow(window);
+    LW2D_destroyWindow(window);
     return 0;
 }
